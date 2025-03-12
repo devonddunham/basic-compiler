@@ -1,4 +1,5 @@
 import enum
+import sys
 
 # lexer
 class Lexer:
@@ -23,15 +24,21 @@ class Lexer:
         return self.source[self.cur_pos + 1]
     # inavlid token
     def abort(self, msg):
-        pass
+        sys.exit("Lexing error. " + msg)
     # skip whitespace except newlines, which will indicate end of statement
     def skip_whitespace(self):
-        pass
+        while self.cur_char == ' ' or self.cur_char == '\t' or self.cur_char == '\r':
+            self.next()
     # skip comments
     def skip_comment(self):
-        pass
+        if self.cur_char == '#':
+            while self.cur_char != '\n':
+                self.next()
     # return next token
     def get_token(self):
+        self.skip_whitespace()
+        self.skip_comment()
+        token = None
         if self.cur_char == '+':
             token = Token(self.cur_char, TokenType.PLUS)
         elif self.cur_char == '-':
@@ -40,13 +47,45 @@ class Lexer:
             token = Token(self.cur_char, TokenType.ASTERISK)
         elif self.cur_char == '/':
             token = Token(self.cur_char, TokenType.SLASH)
+        elif self.cur_char == '=':
+            # check for EQ or EQEQ
+            if self.peek() == '=':
+                last_char = self.cur_char
+                self.next()
+                token = Token(last_char + self.cur_char, TokenType.EQEQ)
+            else:
+                token = Token(self.cur_char, TokenType.EQ)
+        elif self.cur_char == '>':
+            # check for GTEQ
+            if self.peek() == '=':
+                last_char = self.cur_char
+                self.next()
+                token = Token(last_char + self.cur_char, TokenType.GTEQ)
+            else:
+                token = Token(self.cur_char, TokenType.GT)
+        elif self.cur_char == '<':
+            # check for LTEQ
+            if self.peek() == '=':
+                last_char = self.cur_char
+                self.next()
+                token = Token(last_char + self.cur_char, TokenType.LTEQ)
+            else:
+                token = Token(self.cur_char, TokenType.LT)
+        elif self.cur_char == '!':
+            # check for NOTEQ
+            if self.peek() == '=':
+                last_char = self.cur_char
+                self.next()
+                token = Token(last_char + self.cur_char, TokenType.NOTEQ)
+            else:
+                self.abort("Expected !=, got !" + self.peek())
         elif self.cur_char == '\n':
             token = Token(self.cur_char, TokenType.NEWLINE)
         elif self.cur_char == '\0':
             token = Token(self.cur_char, TokenType.EOF)
         else:
             # UNKNOWN
-            pass
+            self.abort("Unknown token: " + self.cur_char)
         self.next()
         return token
 
