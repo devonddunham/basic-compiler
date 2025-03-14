@@ -6,6 +6,11 @@ from lex import *
 class Parser:
     def __init__(self, lexer):
         self.lexer = lexer
+
+        self.symbols = set() # variables declared
+        self.labels_declared = set() # labels declared
+        self.labels_gotoed = set() # labels goto'ed
+
         self.cur_token = None
         self.peek_token = None
         self.next()
@@ -45,6 +50,10 @@ class Parser:
         # parse all statements
         while not self.check_token(TokenType.EOF):
             self.statement()
+        # check that label referenced in GOTO is declared
+        for label in self.labels_gotoed:
+            if label not in self.labels_declared:
+                self.abort("Attempting to GOTO to undeclared label: " + label)
     
     # 7 different types of statements
     def statement(self):
@@ -90,6 +99,12 @@ class Parser:
         elif self.check_token(TokenType.LABEL):
             print("STATEMENT-LABEL")
             self.next()
+
+            # check if label doesnt already exist
+            if self.cur_token.text in self.labels_declared:
+                self.abort("Label already exists: " + self.cur_token.text)
+            self.labels_declared.add(self.cur_token.text)
+
             # expect an identifier
             self.match(TokenType.IDENT)
         
@@ -97,6 +112,8 @@ class Parser:
         elif self.check_token(TokenType.GOTO):
             print("STATEMENT-GOTO")
             self.next()
+            # dont need to check if it already exists because we can go to the label multiple times
+            self.labels_gotoed.add(self.cur_token.text)
             # expect an identifier
             self.match(TokenType.IDENT)
         
@@ -104,6 +121,11 @@ class Parser:
         elif self.check_token(TokenType.LET):
             print("STATEMENT-LET")
             self.next()
+
+            # check if variable already exists
+            if self.cur_token.text not in self.symbols:
+                self.symbols.add(self.cur_token.text)
+
             # expect an identifier
             self.match(TokenType.IDENT)
             self.match(TokenType.EQ)
@@ -114,6 +136,11 @@ class Parser:
         elif self.check_token(TokenType.INPUT):
             print("STATEMENT-INPUT")
             self.next()
+
+            # check if variable already exists
+            if self.cur_token.text not in self.symbols:
+                self.symbols.add(self.cur_token.text)
+
             # expect an identifier
             self.match(TokenType.IDENT)
         
@@ -124,6 +151,78 @@ class Parser:
         # newline
         self.nl()
     
+    # comparison ::= expression (("==" | "!=" | ">" | ">=" | "<" | "<=") expression)+
+    def comparison(self):
+        print("COMPARISON")
+
+        # expect an expression
+        self.expression()
+        # must be at least one comparison operator
+        if self.is_comparison_operator():
+            self.next()
+            self.expression()
+        else:
+            self.abort("Expected comparison operator at: " + self.cur_token.text)
+        
+        while self.is_comparison_operator():
+            # allow multiple comparison operators
+            self.next()
+            # expect an expression
+            self.expression()
+    
+    # expression ::= term {("+" | "-") term}
+    def expression(self):
+        print("EXPRESSION")
+
+        # expect a term
+        self.term()
+        # can have zero or more +/- and expressions
+        while self.check_token(TokenType.PLUS) or self.check_token(TokenType.MINUS):
+            self.next()
+            self.term()
+    
+    # term :: unary {( "/" | "*" ) unary}
+    # have precedence over +-
+    def term(self):
+        print("TERM")
+
+        # expect a unary
+        self.unary()
+        # can have zero or more * / and unary
+        while self.check_token(TokenType.ASTERISK) or self.check_token(TokenType.SLASH):
+            self.next()
+            self.unary()
+    
+    # unary :: [ "+" | "-" ] primary
+    def unary(self):
+        print("UNARY")
+
+        # optional sign
+        if self.check_token(TokenType.PLUS) or self.check_token(TokenType.MINUS):
+            self.next()
+        # expect a primary
+        self.primary()
+    
+    # primary ::= number | ident
+    def primary(self):
+        print("PRIMARY (" + self.cur_token.text + ")")
+
+        # expect a number or identifier
+        if self.check_token(TokenType.NUMBER):
+            self.next()
+        elif self.check_token(TokenType.IDENT):
+            # check if variable exists
+            if self.cur_token.text not in self.symbols:
+                self.abort("Referencing variable before assignment: " + self.cur_token.text)
+            self.next()
+        else:
+            self.abort("Unexpected token at " + self.cur_token.text)
+    
+    def is_comparison_operator(self):
+        return self.check_token(TokenType.EQ) or self.check_token(TokenType.NOTEQ) or \
+            self.check_token(TokenType.GT) or self.check_token(TokenType.GTEQ) or \
+            self.check_token(TokenType.LT) or self.check_token(TokenType.LTEQ)
+
     # nl ::= '\n' +
     def nl(self):
         print("NEWLINE")
