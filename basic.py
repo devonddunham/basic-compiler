@@ -1,5 +1,6 @@
 from lex import *
 from parse import *
+from emit import *
 import sys
 
 def main():
@@ -13,10 +14,12 @@ def main():
     
     # init lexer and parser
     lexer = Lexer(source)
-    parser = Parser(lexer)
+    emitter = Emitter("out.cpp")
+    parser = Parser(lexer, emitter)
 
     # parse the source code
     parser.program() # start
+    emitter.write_file() # write to file
     print("Parsing complete.")
 
 if __name__ == "__main__":
